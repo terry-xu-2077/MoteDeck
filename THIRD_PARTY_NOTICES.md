@@ -85,6 +85,31 @@ library, so no separate runtime package is installed. The SenseVoice model
 itself is not bundled: it is downloaded only after an explicit user action in
 the settings window and stored in the user's own configuration directory.
 
+### CapsWriter-Offline
+
+- Project: CapsWriter-Offline (© 2026 Haujet Zhao)
+- Source: <https://github.com/HaujetZhao/CapsWriter-Offline>
+- License: MIT
+- License text: `THIRD_PARTY_LICENSES/CapsWriter-Offline/LICENSE.txt`
+- Distributed form: the hotword phoneme-matching and rule-substitution
+  algorithms are included as `capswriter_hw_*.py` source modules (only the
+  package-internal imports and logging were adapted). The CapsWriter speech
+  service itself is not bundled: MoteDeck starts and talks to the user's own
+  separately installed copy over a local WebSocket.
+
+### websockets, pypinyin and rapidfuzz
+
+- `websockets==15.0.1` — <https://github.com/python-websockets/websockets>,
+  BSD-3-Clause, `THIRD_PARTY_LICENSES/websockets-15.0.1/LICENSE.txt`
+- `pypinyin==0.55.0` — <https://github.com/mozillazg/python-pinyin>, MIT,
+  `THIRD_PARTY_LICENSES/pypinyin-0.55.0/LICENSE.txt`
+- `rapidfuzz==3.14.1` — <https://github.com/rapidfuzz/RapidFuzz>, MIT,
+  `THIRD_PARTY_LICENSES/rapidfuzz-3.14.1/LICENSE.txt`
+
+They provide the local WebSocket client used to send remote-control audio to
+the CapsWriter speech service and the pinyin/fuzzy matching used for hotword
+correction.
+
 ### pywinrt projections
 
 The following packages are all version 3.2.1 and licensed under MIT:

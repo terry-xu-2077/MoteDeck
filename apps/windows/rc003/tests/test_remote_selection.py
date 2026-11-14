@@ -841,6 +841,8 @@ diagnostics = classes['DiagnosticsController'](controller, m.config.config_root(
 diagnostics.refreshDiagnostics = lambda: None
 for name, instance in [('SettingsController', controller), ('ButtonMappingModel', model), ('DiagnosticsController', diagnostics)]:
     classes['qmlRegisterSingletonInstance'](classes[name], 'MoteDeckSettings', 1, 0, name, instance)
+capswriter = classes['CapsWriterController'](m.config.config_root())
+classes['qmlRegisterSingletonInstance'](classes['CapsWriterController'], 'MoteDeckSettings', 1, 0, 'CapsWriterController', capswriter)
 engine = classes['QQmlApplicationEngine']()
 warnings = []
 engine.warnings.connect(lambda messages: warnings.extend(str(message) for message in messages))

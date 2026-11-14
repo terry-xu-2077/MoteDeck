@@ -228,6 +228,10 @@ VOICE_KEY_PLUGIN_VOKIE = "vokie"
 # 提供：快捷键不可编辑、连接期间不能删，断开连接时随连接一起清掉。真正的
 # 用途是切到它时切到对应的 OpenMexia 应用配置。
 VOICE_KEY_PLUGIN_OPENMEXIA = "openmexia"
+# CapsWriter 语音键：遥控器 PCM 直接送本机 CapsWriter 服务识别，文字敲进当前
+# 焦点窗口。不需要键盘快捷键，也不需要虚拟声卡；在「按键」页把遥控器按键
+# 指到这条语音键即可。
+VOICE_KEY_PLUGIN_CAPSWRITER = "capswriter"
 
 
 def is_locked_plugin_id(value: object) -> bool:
@@ -240,6 +244,12 @@ def is_openmexia_plugin_id(value: object) -> bool:
     """Whether one plugin id belongs to the OpenMexia voice key."""
 
     return _normalize_plugin_id(value) == VOICE_KEY_PLUGIN_OPENMEXIA
+
+
+def is_capswriter_plugin_id(value: object) -> bool:
+    """Whether one plugin id marks the direct CapsWriter voice key."""
+
+    return _normalize_plugin_id(value) == VOICE_KEY_PLUGIN_CAPSWRITER
 
 
 def _normalize_plugin_id(value: object) -> str:
@@ -1188,6 +1198,51 @@ def ensure_openmexia_voice_key(
             slot=slot,
             name=name,
             plugin=VOICE_KEY_PLUGIN_OPENMEXIA,
+        )
+    )
+    return _with_voice_key_configs(config_data, entries), slot
+
+
+def capswriter_voice_key_slot(config_data: Dict[str, Any]) -> Optional[int]:
+    for entry in voice_key_configs(config_data):
+        if is_capswriter_plugin_id(entry.get("plugin")):
+            return int(entry["id"])
+    return None
+
+
+def ensure_capswriter_voice_key(
+    config_data: Dict[str, Any], *, name: str = "CapsWriter"
+) -> Tuple[Dict[str, Any], Optional[int]]:
+    """Make sure one direct-CapsWriter voice key exists; return the copy and id.
+
+    Migration: an existing hand-made key whose name is "CapsWriter" (it used to
+    replay a keyboard shortcut for the separate CapsWriter client) is converted
+    in place, so any remote button already bound to it keeps working without
+    the shortcut or a virtual cable. Otherwise a new key is appended.
+    """
+
+    existing = capswriter_voice_key_slot(config_data)
+    if existing is not None:
+        return dict(config_data), existing
+    from . import key_mapping
+
+    entries = voice_key_configs(config_data)
+    for entry in entries:
+        if (
+            not _normalize_plugin_id(entry.get("plugin"))
+            and str(entry.get("name") or "").strip().lower() == "capswriter"
+        ):
+            entry["plugin"] = VOICE_KEY_PLUGIN_CAPSWRITER
+            entry["hotkey"] = ""
+            entry["tsf_switch"] = False
+            entry["tsf_profile"] = ""
+            return _with_voice_key_configs(config_data, entries), int(entry["id"])
+    if len(entries) >= key_mapping.MAX_VOICE_SLOTS:
+        return dict(config_data), None
+    slot = max((entry["id"] for entry in entries), default=1) + 1
+    entries.append(
+        _default_voice_key_config(
+            slot=slot, name=name, plugin=VOICE_KEY_PLUGIN_CAPSWRITER
         )
     )
     return _with_voice_key_configs(config_data, entries), slot

@@ -9,6 +9,11 @@ from typing import Tuple
 from .voice_shortcut_session import _VOICE_HOTKEY_BACKEND_MARKED
 import array
 from . import bridge_runtime_status
+from . import capswriter_client
+from . import capswriter_postprocess
+from . import capswriter_service
+from . import text_typing_windows
+from . import voice_live
 from . import config
 from . import diagnostic_trace
 from . import key_mapping
@@ -147,9 +152,25 @@ class VoiceCaptureMixin:
         entry = config.voice_key_config(self._config, slot)
         if entry is None:
             return False
+        if config.is_capswriter_plugin_id(entry.get("plugin")):
+            # CapsWriter 语音键：遥控器 PCM 直接送本机语音服务，不需要本地模型文件。
+            return True
         if not config.is_openmexia_plugin_id(entry.get("plugin")):
             return False
         return local_asr.model_available(self._config_root)
+
+    def _capswriter_slot(self, slot: Optional[int]) -> bool:
+        entry = config.voice_key_config(self._config, slot) if slot is not None else None
+        return bool(entry and config.is_capswriter_plugin_id(entry.get("plugin")))
+
+    def _capswriter_endpoint(self):
+        """(host, port)：已登记的 CapsWriter 目录里配置的服务端口；找不到目录返回 None。"""
+
+        settings = capswriter_service.load_settings(self._config_root)
+        root = capswriter_service.find_install_root(settings)
+        if root is None:
+            return None
+        return ("127.0.0.1", capswriter_service.read_port(root))
 
     def _voice_key_gain_locked(self, slot: Optional[int]) -> float:
         """这条语音键的录音增益倍数（1.0 表示不调整）。"""
@@ -269,6 +290,9 @@ class VoiceCaptureMixin:
                 continue
             dbfs = 20.0 * math.log10(value)
             levels.append(min(0.9, max(0.0, (dbfs + 60.0) / 55.0)))
+        voice_live.publish(
+            self._config_root, level_only=True, level=float(levels[-1]), phase="listening"
+        )
         try:
             self._voice_mode_toast.update_level(levels)
         except BaseException as exc:  # noqa: BLE001 - the capsule is best effort
@@ -369,6 +393,7 @@ class VoiceCaptureMixin:
         self._set_runtime_voice_result(bridge_runtime_status.VOICE_RUNTIME_ACTIVE)
         # 长按期间的反馈：在模式气泡的位置弹出电平胶囊，告诉用户开始说话。
         self._show_voice_level_capsule()
+        voice_live.publish(self._config_root, phase="listening", level=0.0, text="", error="")
         self._logger.info("openmexia asr started: slot=%s", slot)
         return True
 
@@ -427,6 +452,11 @@ class VoiceCaptureMixin:
         frames = self._asr_frames
         self._reset_asr_capture_locked()
         self._hide_voice_level_capsule()
+        voice_live.publish(
+            self._config_root,
+            phase="recognizing" if was_active else "idle",
+            level=0.0,
+        )
         if close_mic:
             session = self._ble_session
             if session is not None:
@@ -489,10 +519,16 @@ class VoiceCaptureMixin:
                     type(exc).__name__,
                 )
         try:
-            self._asr_runner.submit(
-                pcm,
-                on_result=self._on_asr_result,
-            )
+            if self._capswriter_slot(slot):
+                self._capswriter_runner.submit(
+                    pcm,
+                    on_result=self._on_capswriter_result,
+                )
+            else:
+                self._asr_runner.submit(
+                    pcm,
+                    on_result=self._on_asr_result,
+                )
         except BaseException as exc:  # noqa: BLE001 - never trap input
             self._logger.warning(
                 "openmexia asr submit failed: error_type=%s",
@@ -534,6 +570,32 @@ class VoiceCaptureMixin:
                 "chromecast release", close_mic=False
             )
             return committed
+
+    def _on_capswriter_result(self, text: str, error: Optional[str]) -> None:
+        """CapsWriter 识别回调：文字直接敲进当前焦点窗口。"""
+
+        if error:
+            self._logger.info("capswriter asr failed: %s", error)
+            voice_live.publish(self._config_root, phase="idle", level=0.0, text="", error=str(error), at=time.time())
+            return
+        root = capswriter_service.find_install_root(
+            capswriter_service.load_settings(self._config_root)
+        )
+        value = self._capswriter_postprocessor.process(str(text), root).strip()
+        if not value:
+            voice_live.publish(self._config_root, phase="idle", level=0.0, text="", error="没有听清内容", at=time.time())
+            return
+        voice_live.publish(self._config_root, phase="idle", level=0.0, text=value, error="", at=time.time())
+        if voice_live.test_mode_active(self._config_root):
+            self._logger.info("capswriter asr test mode: not typing")
+            return
+        self._logger.info("capswriter asr text length: %s", len(value))
+        try:
+            text_typing_windows.type_text(value)
+        except BaseException as exc:  # noqa: BLE001 - never trap input
+            self._logger.warning(
+                "capswriter text typing failed: error_type=%s", type(exc).__name__
+            )
 
     def _on_asr_result(self, text: str, error: Optional[str]) -> None:
         """识别线程回调：成功就把文字交给 OpenMexia 去执行。"""

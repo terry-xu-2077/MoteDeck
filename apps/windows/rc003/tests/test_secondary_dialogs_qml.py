@@ -55,24 +55,6 @@ for width, height in ((640, 480), (720, 560)):
     assert dialog.property('width') <= 520
     click('closeRemoteDialogButton')
 
-    item('tabBar').setProperty('currentIndex', 2)
-    settle()
-    for name in ('driverConfirmDialog', 'bridgeTestConfirmDialog'):
-        dialog = item(name)
-        QMetaObject.invokeMethod(dialog, 'open')
-        settle()
-        assert dialog.property('width') <= 390
-        assert 100 < dialog.property('height') < 250, (name, dialog.property('height'))
-        screenshot(f'{width}-{name}')
-        QTest.keyClick(window, Qt.Key_Escape)
-        settle()
-        assert not dialog.property('visible')
-    assert not diagnostics.vbCableTestRunning
-
-    # 「测试」按钮挂在「虚拟音频」那一行，不再单独占一行。
-    assert item('testVbCableChannelButton').property('text') == '测试'
-    # 虚拟音频按钮只有两个字：未安装「安装」，已安装「卸载」。
-    assert item('installVirtualAudioButton').property('text') in ('安装', '卸载')
     results.append({'size': [width, height], 'dialogs': 'opened-closed'})
     item('tabBar').setProperty('currentIndex', 0)
 

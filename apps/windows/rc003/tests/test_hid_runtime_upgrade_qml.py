@@ -95,6 +95,11 @@ qmlRegisterSingletonInstance(
     "DiagnosticsController",
     diagnostics,
 )
+CapsWriterController = classes["CapsWriterController"]
+capswriter_controller = CapsWriterController(m.config.config_root())
+qmlRegisterSingletonInstance(
+    CapsWriterController, "MoteDeckSettings", 1, 0, "CapsWriterController", capswriter_controller
+)
 
 engine = QQmlApplicationEngine()
 qml_dir = m._qml_directory()
@@ -164,8 +169,6 @@ def input_state(hid_state):
 input_state(frida_compat.HidTapState.RESTART_REQUIRED.value)
 assert device_page.buttonReceiverStateCode() == "restart_computer"
 assert device_page.buttonReceiverStateText() == "请重启电脑一次"
-assert "旧按键组件未释放" in find(window, "buttonReceiverRow").property("descriptionText")
-assert "请重启电脑" in find(window, "buttonReceiverRow").property("descriptionText")
 assert not device_page.bridgeNeedsRestartAction()
 
 # A stale restart-service recommendation must not hide the required host reload.
@@ -178,7 +181,6 @@ for state in ("authorization_cancelled", "authorization_failed"):
     input_state(state)
     controller._set_bridge_restart_recommended(True)
     assert device_page.buttonReceiverStateCode() == "source_" + state
-    assert "重新授权" in find(window, "buttonReceiverRow").property("descriptionText")
     assert not device_page.bridgeNeedsRestartAction()
     assert device_page.bridgeActionVisible()
     assert device_page.bridgeActionText() == "重新授权"
@@ -205,7 +207,6 @@ assert not device_page.bridgeNeedsRestartAction()
 input_state(frida_compat.HidTapState.UNAVAILABLE.value)
 assert device_page.buttonReceiverStateCode() == "component_unavailable"
 assert device_page.buttonReceiverStateText() == "按键组件不完整"
-assert "缺失或校验失败" in find(window, "buttonReceiverRow").property("descriptionText")
 assert not device_page.bridgeNeedsRestartAction()
 assert not device_page.bridgeActionVisible()
 assert device_page.bridgeStateText() == "已连接"

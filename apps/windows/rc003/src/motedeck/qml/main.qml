@@ -1132,6 +1132,7 @@ ApplicationWindow {
                             backTabTarget: voiceTabButton
                             tabTarget: deviceTabButton
                             onOpenButtonsRequested: window.requestPage(1)
+                            onOpenVoiceRequested: window.requestPage(2)
                         }
                         Loader {
                             id: buttonsPageLoader

@@ -624,6 +624,12 @@ class SettingsController(QObject):
         # OpenMexia 同理：上次离开时连着，这次启动就自动连回去。
         if self._config.get("openmexia_auto_connect") is True:
             QTimer.singleShot(0, self._restore_openmexia_connection)
+        # 用独立的一次性定时器而不是 QTimer.singleShot：启动后再登记语音键，
+        # 不干扰别处对 singleShot 调用次数的约定。
+        self._capswriter_key_timer = QTimer(self)
+        self._capswriter_key_timer.setSingleShot(True)
+        self._capswriter_key_timer.timeout.connect(self._capswriter_ensure_voice_key)
+        self._capswriter_key_timer.start(0)
 
     # -- internal helpers -------------------------------------------------
 
@@ -4158,7 +4164,9 @@ class SettingsController(QObject):
         entry = config.voice_key_config(self._config, slot)
         if entry is None:
             return
-        if config.is_locked_plugin_id(entry.get("plugin")):
+        if config.is_locked_plugin_id(entry.get("plugin")) and not config.is_capswriter_plugin_id(
+            entry.get("plugin")
+        ):
             self._set_status_message("")
             self._set_error_message(
                 "该语音键由 OpenMexia 联动提供，断开连接后会自动清除。"
@@ -4168,7 +4176,9 @@ class SettingsController(QObject):
             )
             return
         label = config.voice_key_name(self._config, slot)
-        new_config = config.remove_voice_key_config(self._config, slot)
+        new_config = config.remove_voice_key_config(
+            self._config, slot, force=config.is_capswriter_plugin_id(entry.get("plugin"))
+        )
         if config.voice_key_configs(new_config) == config.voice_key_configs(
             self._config
         ):
@@ -4833,6 +4843,31 @@ class SettingsController(QObject):
         if not self._openmexia_connected:
             return False
         return self.connectOpenMexia()
+
+    def _capswriter_ensure_voice_key(self) -> None:
+        """首次发现 CapsWriter 时登记一条直连语音键（已有同名手建键就原地转换）。
+
+        只做一次：之后用户删掉这条键，不会在下次启动时又冒出来。
+        """
+
+        try:
+            from . import capswriter_service
+
+            if self.configurationReadOnly:
+                return
+            settings = capswriter_service.load_settings(self._config_root)
+            if settings.voice_key_created:
+                return
+            if capswriter_service.find_install_root(settings) is None:
+                return
+            new_config, slot = config.ensure_capswriter_voice_key(self._config)
+            if slot is not None and new_config != self._config:
+                if not self._save_voice_config_data(new_config):
+                    return
+            settings.voice_key_created = True
+            capswriter_service.save_settings(self._config_root, settings)
+        except Exception:  # noqa: BLE001 - 迁移失败不能挡住启动
+            pass
 
     def _openmexia_ensure_voice_key(self) -> None:
         """连接后自动多一条 OpenMexia 语音键（已有就不重复加）。"""

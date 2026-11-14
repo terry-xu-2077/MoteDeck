@@ -42,6 +42,8 @@ try:
     diagnostics = classes['DiagnosticsController'](controller, controller._config_root, auto_refresh=False)
     for key, instance in [('SettingsController', controller), ('ButtonMappingModel', model), ('DiagnosticsController', diagnostics)]:
         classes['qmlRegisterSingletonInstance'](classes[key], 'MoteDeckSettings', 1, 0, key, instance)
+    capswriter = classes['CapsWriterController'](controller._config_root)
+    classes['qmlRegisterSingletonInstance'](classes['CapsWriterController'], 'MoteDeckSettings', 1, 0, 'CapsWriterController', capswriter)
     engine = classes['QQmlApplicationEngine']()
     warnings = []
     engine.warnings.connect(lambda items: warnings.extend(item.toString() for item in items))

@@ -16,6 +16,7 @@ Item {
     readonly property int deviceStateColumnWidth: 96
     readonly property int deviceActionColumnWidth: tokens.buttonWidth4Chars
     signal openButtonsRequested()
+    signal openVoiceRequested()
 
     function restoreLogExportFocus() {
         Qt.callLater(function() {
@@ -743,7 +744,7 @@ Item {
                         text: qsTr("选择设备")
                         onClicked: remoteDeviceDialog.open()
                         KeyNavigation.backtab: openBluetoothSettingsButton
-                        KeyNavigation.tab: buttonReceiverPrimaryButton
+                        KeyNavigation.tab: capsWriterToggleTileButton
                     }
                 }
 
@@ -767,37 +768,6 @@ Item {
                 Layout.preferredHeight: 119
                 Layout.topMargin: 16
                 spacing: 12
-
-                DeviceTile {
-                    objectName: "buttonReceiverRow"
-                    Layout.fillWidth: true
-                    Layout.preferredWidth: 0
-                    tokens: root.tokens
-                    iconName: "keys"
-                    titleText: qsTr("按键接收")
-                    descriptionText: root.buttonReceiverStateCode() === "source_authorization_cancelled"
-                        ? qsTr("未完成管理员授权，点击“重新授权”")
-                        : root.buttonReceiverStateCode() === "source_authorization_failed"
-                        ? qsTr("未取得按键权限，点击“重新授权”")
-                        : root.buttonReceiverStateCode() === "restart_computer"
-                        ? qsTr("旧按键组件未释放，请重启电脑")
-                        : root.buttonReceiverStateCode() === "component_unavailable"
-                        ? qsTr("组件缺失或校验失败")
-                        : root.buttonReceiverStateCode() === "recovering"
-                        ? qsTr("按键设备尚未就绪，正在自动重试")
-                        : qsTr("让遥控器按键在电脑上生效")
-                    stateText: root.buttonReceiverStateText()
-                    stateColor: root.buttonReceiverStateColor()
-
-                    CompactButton {
-                        id: buttonReceiverPrimaryButton
-                        objectName: "openButtonSettingsButton"
-                        tokens: root.tokens
-                        flat: true
-                        text: qsTr("快速配置")
-                        onClicked: quickSetupDialog.open()
-                    }
-                }
 
                 DeviceTile {
                     objectName: "remoteServiceRow"
@@ -858,43 +828,37 @@ Item {
                 }
 
                 DeviceTile {
-                    objectName: "runtimeLogRow"
+                    objectName: "voiceModelServiceRow"
                     Layout.fillWidth: true
                     Layout.preferredWidth: 0
                     tokens: root.tokens
-                    iconName: "refresh"
-                    titleText: qsTr("检查更新")
-                    descriptionText: qsTr("有新版本时在这里提示")
-                    stateText: SettingsController.applicationUpdateCanDownload
-                        ? qsTr("有新版本") : ""
-                    stateColor: root.tokens.accent
+                    iconName: "mic"
+                    titleText: qsTr("语音模型服务")
+                    descriptionText: CapsWriterController.found
+                        ? qsTr("本地离线识别：%1").arg(CapsWriterController.modelLabel)
+                        : qsTr("未找到 CapsWriter，请先指定目录")
+                    stateText: CapsWriterController.stateText
+                    stateColor: CapsWriterController.running
+                        ? root.tokens.successColor : root.tokens.textTertiary
 
                     CompactButton {
-                        id: deviceUsageLink
-                        objectName: "deviceUsageLink"
+                        id: capsWriterToggleTileButton
+                        objectName: "capsWriterToggleTileButton"
+                        visible: CapsWriterController.found
                         tokens: root.tokens
                         flat: true
-                        text: qsTr("关于")
-                        KeyNavigation.tab: checkApplicationUpdateButton
-                        onClicked: aboutDialog.open()
+                        enabled: !CapsWriterController.busy
+                        text: CapsWriterController.busy ? qsTr("处理中…")
+                            : (CapsWriterController.running ? qsTr("停止服务") : qsTr("启动服务"))
+                        onClicked: CapsWriterController.running
+                            ? CapsWriterController.stop() : CapsWriterController.start()
                     }
                     CompactButton {
-                        id: checkApplicationUpdateButton
-                        objectName: "checkApplicationUpdateButton"
+                        objectName: "capsWriterSettingsButton"
                         tokens: root.tokens
-                        text: SettingsController.applicationUpdateCheckBusy
-                            ? qsTr("检查中…")
-                            : (SettingsController.applicationUpdateCanDownload
-                                ? qsTr("查看更新") : qsTr("检查更新"))
-                        enabled: !SettingsController.applicationUpdateBusy
-                        KeyNavigation.backtab: deviceUsageLink
+                        text: qsTr("设置")
                         KeyNavigation.tab: launchAtLoginSwitch
-                        onClicked: {
-                            if (SettingsController.applicationUpdateCanDownload)
-                                SettingsController.showApplicationUpdate()
-                            else
-                                SettingsController.checkForApplicationUpdate()
-                        }
+                        onClicked: root.openVoiceRequested()
                     }
                 }
             }

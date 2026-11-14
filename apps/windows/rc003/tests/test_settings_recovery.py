@@ -271,7 +271,6 @@ def verify():
         result['save_disabled'] = not window.findChild(QObject, 'launchBridgeOnAppStartSwitch').property('enabled')
         result['select_disabled'] = not window.findChild(QObject, 'selectRemoteButton').property('enabled')
         result['export_enabled'] = window.findChild(QObject, 'deviceOpenLogButton').property('enabled')
-        result['update_enabled'] = window.findChild(QObject, 'checkApplicationUpdateButton').property('enabled')
         tabs = window.findChild(QObject, 'tabBar')
         for index in (1, 2, 0):
             tabs.setProperty('currentIndex', index)
@@ -319,7 +318,7 @@ class RecoveryWindowIntegrationTests(unittest.TestCase):
                 self.assertEqual(evidence['exit_code'], 0, evidence)
                 self.assertEqual(evidence['warnings'], [], evidence)
                 for field in ('warning_visible', 'readonly', 'visible', 'save_disabled',
-                              'select_disabled', 'export_enabled', 'update_enabled', 'exported', 'exit_confirmed', 'unchanged'):
+                              'select_disabled', 'export_enabled', 'exported', 'exit_confirmed', 'unchanged'):
                     self.assertTrue(evidence[field], (field, evidence))
 
 

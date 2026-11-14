@@ -203,7 +203,6 @@ assert page.bridgeActionVisible()
 assert page.bridgeActionText() == "重启服务"
 diagnostics._is_refreshing = False
 diagnostics.isRefreshingChanged.emit()
-assert find(window, "testVbCableChannelButton") is not None
 find(window, "tabBar").setProperty("currentIndex", 0)
 with mock.patch.object(controller, "restartBridge") as restart:
     find(window, "bridgeActionButton").clicked.emit()

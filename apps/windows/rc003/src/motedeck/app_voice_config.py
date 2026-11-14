@@ -313,6 +313,10 @@ class VoiceConfigMixin:
                 "voice mapping ignored: voice key %s is switched off", slot
             )
             return False
+        if self._capswriter_slot(slot):
+            # CapsWriter 直连键没有键盘快捷键可重放：PCM 由按下后的识别流程
+            # 接管，这里不需要（也不能）解析快捷键。
+            return True
         # 切到 OpenMexia 那条语音键时，整套按键临时换成米家设备那套配置。
         self._schedule_openmexia_profile_for_slot(slot)
         hotkey_text = self._voice_hotkey_text_for_slot(slot)

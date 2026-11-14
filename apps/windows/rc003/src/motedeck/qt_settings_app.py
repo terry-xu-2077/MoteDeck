@@ -546,7 +546,8 @@ def _release_qt_classes_cache() -> None:
     _package = sys.modules.get("motedeck")
     for _qml_module_name in ("motedeck.qt_settings_mapping_model",
                              "motedeck.qt_settings_controller",
-                             "motedeck.qt_settings_diagnostics_panel"):
+                             "motedeck.qt_settings_diagnostics_panel",
+                             "motedeck.qt_settings_capswriter"):
         _qml_module = sys.modules.pop(_qml_module_name, None)
         # The import machinery binds every submodule as an attribute of its
         # parent package (``from .qt_settings_controller import ...`` sets
@@ -702,6 +703,7 @@ def _load_qt_classes() -> dict:
     from .qt_settings_mapping_model import ButtonMappingModel
     from .qt_settings_diagnostics_panel import DiagnosticsController
     from .qt_settings_controller import SettingsController
+    from .qt_settings_capswriter import CapsWriterController
 
     _qt_classes_cache = {
         # Keep the established cache key for tests/callers, but construct the
@@ -716,6 +718,7 @@ def _load_qt_classes() -> dict:
         "ButtonMappingModel": ButtonMappingModel,
         "SettingsController": SettingsController,
         "DiagnosticsController": DiagnosticsController,
+        "CapsWriterController": CapsWriterController,
     }
 
     return _qt_classes_cache
@@ -728,6 +731,7 @@ _QML_MODULE_URI = "MoteDeckSettings"
 _QML_CONTROLLER_TYPE_NAME = "SettingsController"
 _QML_MAPPING_MODEL_TYPE_NAME = "ButtonMappingModel"
 _QML_DIAGNOSTICS_TYPE_NAME = "DiagnosticsController"  # XRBM-031
+_QML_CAPSWRITER_TYPE_NAME = "CapsWriterController"
 
 _renderer_preference_applied = False
 
@@ -788,6 +792,7 @@ def run_settings_window(
     ButtonMappingModel = classes["ButtonMappingModel"]
     SettingsController = classes["SettingsController"]
     DiagnosticsController = classes["DiagnosticsController"]
+    CapsWriterController = classes["CapsWriterController"]
 
     # Windows 11 Fluent look (In-scope item 7/DESIGN_VARIANCE): QQuickStyle
     # must be set before the QGuiApplication/engine is constructed. Qt 6.7+
@@ -876,6 +881,15 @@ def run_settings_window(
             0,
             _QML_DIAGNOSTICS_TYPE_NAME,
             diagnostics_controller,
+        )
+        capswriter_controller = CapsWriterController(config.config_root())
+        qmlRegisterSingletonInstance(
+            CapsWriterController,
+            _QML_MODULE_URI,
+            1,
+            0,
+            _QML_CAPSWRITER_TYPE_NAME,
+            capswriter_controller,
         )
 
         engine = QQmlApplicationEngine()

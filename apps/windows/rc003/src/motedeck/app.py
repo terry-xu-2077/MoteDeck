@@ -70,6 +70,8 @@ from . import (
     audio_output,
     audio_playback,
     audio_playback_worker,
+    capswriter_client,
+    capswriter_postprocess,
     voice_audio_session,
     voice_shortcut_session,
     action_executor,
@@ -450,6 +452,11 @@ class RC003App(
         # OpenMexia 语音键：录音走本地 SenseVoice 离线识别，识别文字再交给
         # OpenMexia 执行设备指令。识别在后台线程里做，这里只攒 PCM。
         self._asr_runner = local_asr.LocalAsrRunner(self._config_root)
+        self._capswriter_postprocessor = capswriter_postprocess.Postprocessor()
+        self._capswriter_runner = local_asr.LocalAsrRunner(
+            self._config_root,
+            client=capswriter_client.CapsWriterSpeechClient(self._capswriter_endpoint),
+        )
         self._asr_active = False
         self._asr_slot: Optional[int] = None
         self._asr_frames: List[array.array] = []
