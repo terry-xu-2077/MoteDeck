@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 from . import capswriter_client
+from . import capswriter_models
 from . import capswriter_service as svc
 from . import voice_live
 from .qt_settings_qml_tokens import Property, QObject, QTimer, Signal, Slot
@@ -21,9 +22,7 @@ _POLL_MS = 4000
 
 
 def _app_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent
+    return svc.app_dir()
 
 
 class CapsWriterController(QObject):
@@ -31,6 +30,9 @@ class CapsWriterController(QObject):
     busyChanged = Signal()
     messageChanged = Signal(str)
     liveChanged = Signal()
+    downloadChanged = Signal()
+    _downloadProgress = Signal(str, int, int, float)
+    _downloadFinished = Signal(str)
     _statusReady = Signal(object)
     _actionDone = Signal(str)
 
@@ -50,6 +52,13 @@ class CapsWriterController(QObject):
         self._live = {}
         self._live_level = 0.0
         self._test_mode = False
+        self._download_cancel = threading.Event()
+        self._download_phase = ""  # "" 空闲 / downloading / verifying / extracting
+        self._download_done = 0
+        self._download_total = 0
+        self._download_speed = 0.0
+        self._downloadProgress.connect(self._on_download_progress)
+        self._downloadFinished.connect(self._on_download_finished)
         self._live_timer = QTimer(self)
         self._live_timer.setInterval(100)
         self._live_timer.timeout.connect(self._tick_live)
@@ -89,6 +98,40 @@ class CapsWriterController(QObject):
         return "运行中" if self._status.running else "未运行"
 
     stateText = Property(str, _get_state_text, notify=changed)
+
+    downloading = Property(bool, lambda self: bool(self._download_phase), notify=downloadChanged)
+    downloadProgress = Property(
+        float,
+        lambda self: (self._download_done / self._download_total) if self._download_total else 0.0,
+        notify=downloadChanged,
+    )
+
+    def _get_download_text(self) -> str:
+        if not self._download_phase:
+            return ""
+        label = {"downloading": "下载中", "verifying": "校验中", "extracting": "解压中"}[self._download_phase]
+        done, total = self._download_done / 1048576, self._download_total / 1048576
+        text = f"{label} {done:,.0f} / {total:,.0f} MB"
+        if self._download_phase == "downloading" and self._download_speed > 0:
+            text += f" · {self._download_speed / 1048576:.1f} MB/s"
+        return text
+
+    downloadText = Property(str, _get_download_text, notify=downloadChanged)
+
+    def _get_installed_variant(self) -> str:
+        if not self._status.root:
+            return ""
+        package = capswriter_models.installed_package(Path(self._status.root))
+        return package.key if package else ""
+
+    installedVariant = Property(str, _get_installed_variant, notify=changed)
+
+    @Property("QVariantList", constant=True)
+    def modelVariants(self):
+        return [
+            {"key": key, "label": pkg.label, "size": pkg.size}
+            for key, pkg in capswriter_models.PACKAGES.items()
+        ]
 
     liveLevel = Property(float, lambda self: self._live_level, notify=liveChanged)
     livePhase = Property(str, lambda self: str(self._live.get("phase", "idle")), notify=liveChanged)
@@ -146,6 +189,66 @@ class CapsWriterController(QObject):
         threading.Thread(target=target, daemon=True, name="capswriter-action").start()
 
     # -- slots --
+    def _on_download_progress(self, phase: str, done: int, total: int, speed: float) -> None:
+        self._download_phase, self._download_done = phase, done
+        self._download_total, self._download_speed = total, speed
+        self.downloadChanged.emit()
+
+    def _on_download_finished(self, message: str) -> None:
+        self._download_phase = ""
+        self._download_done = self._download_total = 0
+        self.downloadChanged.emit()
+        self._set_message(message)
+        self._set_busy(False)
+        self.refresh()
+
+    @Slot(str)
+    def downloadModel(self, key: str) -> None:
+        """下载并安装 Qwen3-ASR（key：qwen_asr_q4 / qwen_asr_q5）。"""
+
+        package = capswriter_models.PACKAGES.get(key)
+        root = self._status.root
+        if package is None or not root or self._busy:
+            return
+        was_running = self._status.running
+        self._download_cancel.clear()
+        self._set_busy(True)
+        self._on_download_progress("downloading", 0, package.size, 0.0)
+
+        def target() -> None:
+            try:
+                if was_running:  # 正在运行的服务占着模型文件，替换前必须先停
+                    svc.stop_services(Path(root))
+                capswriter_models.install(
+                    Path(root),
+                    package,
+                    lambda phase, done, total, speed: self._downloadProgress.emit(phase, done, total, speed),
+                    self._download_cancel,
+                )
+                svc.write_model_type(Path(root), "qwen_asr")
+                message = "模型已安装"
+                if was_running:
+                    svc.start_services(Path(root), self._settings.start_client)
+                    message += "，服务已重新启动"
+            except capswriter_models.ModelDownloadCancelled:
+                message = "已取消下载（进度已保存，再次点击可继续）"
+                if was_running:
+                    svc.start_services(Path(root), self._settings.start_client)
+            except Exception as exc:  # noqa: BLE001 - 消息给用户看
+                message = f"下载失败：{exc}"
+                if was_running:
+                    try:
+                        svc.start_services(Path(root), self._settings.start_client)
+                    except Exception:  # noqa: BLE001
+                        pass
+            self._downloadFinished.emit(message)
+
+        threading.Thread(target=target, daemon=True, name="capswriter-model-download").start()
+
+    @Slot()
+    def cancelDownload(self) -> None:
+        self._download_cancel.set()
+
     @Slot()
     def startLive(self) -> None:
         if not self._live_timer.isActive():

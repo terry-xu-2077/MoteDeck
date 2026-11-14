@@ -57,6 +57,14 @@ class CapsWriterSettings:
     voice_key_created: bool = False
 
 
+def app_dir() -> Path:
+    """MoteDeck 自己所在的目录：便携版里 ``capswriter`` 文件夹就放在 exe 旁边。"""
+
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
 def settings_path(config_root: Path) -> Path:
     return Path(config_root) / SETTINGS_FILE
 
@@ -94,7 +102,10 @@ def candidate_roots(settings: CapsWriterSettings, app_dir: Optional[Path] = None
     if settings.install_root:
         roots.append(Path(settings.install_root))
     if app_dir is not None:
+        # 便携版根目录是「MoteDeck x.exe + app\ + capswriter\」，真正的程序在 app\ 里，
+        # 所以 exe 所在目录和它的上一级都要找。
         roots.append(Path(app_dir) / "capswriter")
+        roots.append(Path(app_dir).parent / "capswriter")
     roots.extend(Path(item) for item in KNOWN_EXTERNAL_ROOTS)
     return roots
 

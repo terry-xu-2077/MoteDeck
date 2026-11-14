@@ -167,7 +167,7 @@ class VoiceCaptureMixin:
         """(host, port)：已登记的 CapsWriter 目录里配置的服务端口；找不到目录返回 None。"""
 
         settings = capswriter_service.load_settings(self._config_root)
-        root = capswriter_service.find_install_root(settings)
+        root = capswriter_service.find_install_root(settings, capswriter_service.app_dir())
         if root is None:
             return None
         return ("127.0.0.1", capswriter_service.read_port(root))
@@ -579,7 +579,8 @@ class VoiceCaptureMixin:
             voice_live.publish(self._config_root, phase="idle", level=0.0, text="", error=str(error), at=time.time())
             return
         root = capswriter_service.find_install_root(
-            capswriter_service.load_settings(self._config_root)
+            capswriter_service.load_settings(self._config_root),
+            capswriter_service.app_dir(),
         )
         value = self._capswriter_postprocessor.process(str(text), root).strip()
         if not value:

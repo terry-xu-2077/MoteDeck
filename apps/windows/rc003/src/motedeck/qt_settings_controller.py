@@ -4858,7 +4858,7 @@ class SettingsController(QObject):
             settings = capswriter_service.load_settings(self._config_root)
             if settings.voice_key_created:
                 return
-            if capswriter_service.find_install_root(settings) is None:
+            if capswriter_service.find_install_root(settings, capswriter_service.app_dir()) is None:
                 return
             new_config, slot = config.ensure_capswriter_voice_key(self._config)
             if slot is not None and new_config != self._config:

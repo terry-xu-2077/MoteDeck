@@ -185,6 +185,70 @@ Item {
                 SettingRow {
                     tokens: root.tokens
                     Layout.fillWidth: true
+                    titleText: qsTr("Qwen3-ASR 模型")
+                    descriptionText: CapsWriterController.downloading
+                        ? CapsWriterController.downloadText
+                        : (CapsWriterController.installedVariant.length > 0
+                            ? qsTr("已安装") : qsTr("未安装，选择版本后点击下载"))
+                    SelectionComboBox {
+                        id: variantCombo
+                        objectName: "capsWriterVariantCombo"
+                        tokens: root.tokens
+                        enabled: CapsWriterController.found && !CapsWriterController.busy
+                        model: CapsWriterController.modelVariants
+                        textRole: "label"
+                        currentIndex: {
+                            const list = CapsWriterController.modelVariants
+                            for (let i = 0; i < list.length; ++i)
+                                if (list[i].key === CapsWriterController.installedVariant)
+                                    return i
+                            return 0
+                        }
+                    }
+                    CompactButton {
+                        objectName: "capsWriterDownloadButton"
+                        tokens: root.tokens
+                        visible: !CapsWriterController.downloading
+                        highlighted: CapsWriterController.installedVariant.length === 0
+                        enabled: CapsWriterController.found && !CapsWriterController.busy
+                        text: CapsWriterController.installedVariant === variantCombo.model[variantCombo.currentIndex].key
+                            ? qsTr("重新下载") : qsTr("下载")
+                        onClicked: CapsWriterController.downloadModel(
+                            CapsWriterController.modelVariants[variantCombo.currentIndex].key)
+                    }
+                    CompactButton {
+                        objectName: "capsWriterCancelDownloadButton"
+                        tokens: root.tokens
+                        visible: CapsWriterController.downloading
+                        flat: true
+                        text: qsTr("取消")
+                        onClicked: CapsWriterController.cancelDownload()
+                    }
+                }
+
+                Item {
+                    objectName: "capsWriterDownloadProgress"
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: visible ? 14 : 0
+                    visible: CapsWriterController.downloading
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width
+                        height: 4
+                        radius: 2
+                        color: root.tokens.line
+                        Rectangle {
+                            width: parent.width * CapsWriterController.downloadProgress
+                            height: parent.height
+                            radius: 2
+                            color: root.tokens.accent
+                        }
+                    }
+                }
+
+                SettingRow {
+                    tokens: root.tokens
+                    Layout.fillWidth: true
                     showDivider: false
                     titleText: qsTr("服务端口")
                     descriptionText: qsTr("修改后会同步到服务和客户端")

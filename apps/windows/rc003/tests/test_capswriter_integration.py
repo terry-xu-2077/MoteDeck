@@ -236,7 +236,7 @@ _UI_PROBE = textwrap.dedent(
         ("voiceModelServiceRow", "remoteServiceRow", "buttonReceiverRow", "runtimeLogRow")}
     find("voiceTabButton").click(); pump()
     out["voice_controls"] = {n: find(n) is not None for n in
-        ("capsWriterToggleButton", "capsWriterModelCombo", "capsWriterPortField",
+        ("capsWriterToggleButton", "capsWriterVariantCombo", "capsWriterDownloadButton", "capsWriterModelCombo", "capsWriterPortField",
          "capsWriterAutoStartSwitch", "capsWriterStartClientSwitch", "voiceGainSlider",
          "capsWriterTestModeSwitch", "voiceLevelRipple")}
     out["voice_checked"] = bool(find("voiceTabButton").property("checked"))
