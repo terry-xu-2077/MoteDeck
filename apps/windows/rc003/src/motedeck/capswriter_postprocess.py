@@ -73,7 +73,9 @@ def semantic_units(text: str) -> int:
 
 
 class Postprocessor:
-    def __init__(self) -> None:
+    def __init__(self, lexicon=None) -> None:
+        # lexicon：场景词表引擎（热度/领域/学习），可选；None 就只用 CapsWriter 词表。
+        self._lexicon = lexicon
         self._lock = threading.Lock()
         self._root: Optional[Path] = None
         self._stamp: Tuple[float, float, float] = (0.0, 0.0, 0.0)
@@ -112,8 +114,11 @@ class Postprocessor:
 
     def process(self, text: str, root: Optional[Path]) -> str:
         text = str(text or "").strip()
-        if not text or root is None:
+        raw = text
+        if not text:
             return text
+        if root is None:
+            return self._finish(raw, self._apply_lexicon(text))
         root = Path(root)
         with self._lock:
             self._reload_locked(root)
@@ -121,6 +126,7 @@ class Postprocessor:
         try:
             if options["hot"] and phoneme is not None:
                 text = phoneme.correct(text, k=10).text
+            text = self._apply_lexicon(text)
             punc = str(options["trash_punc"])
             limit = int(options["trash_punc_thresh"])
             if punc and (limit <= 0 or semantic_units(text) <= limit):
@@ -129,7 +135,21 @@ class Postprocessor:
                 text = rules.substitute(text)
         except Exception as exc:  # noqa: BLE001
             _LOGGER.warning("capswriter postprocess failed: error_type=%s", type(exc).__name__)
-        return text.strip()
+        return self._finish(raw, text.strip())
+
+    @property
+    def lexicon(self):
+        return self._lexicon
+
+    def _apply_lexicon(self, text: str) -> str:
+        if self._lexicon is None:
+            return text
+        return self._lexicon.apply(text)
+
+    def _finish(self, raw: str, final: str) -> str:
+        if self._lexicon is not None:
+            self._lexicon.observe(raw, final)
+        return final
 
 
 def _read_text(path: Path) -> str:

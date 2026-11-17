@@ -547,7 +547,8 @@ def _release_qt_classes_cache() -> None:
     for _qml_module_name in ("motedeck.qt_settings_mapping_model",
                              "motedeck.qt_settings_controller",
                              "motedeck.qt_settings_diagnostics_panel",
-                             "motedeck.qt_settings_capswriter"):
+                             "motedeck.qt_settings_capswriter",
+                             "motedeck.qt_settings_lexicon"):
         _qml_module = sys.modules.pop(_qml_module_name, None)
         # The import machinery binds every submodule as an attribute of its
         # parent package (``from .qt_settings_controller import ...`` sets

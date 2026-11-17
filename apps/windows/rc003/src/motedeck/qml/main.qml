@@ -60,11 +60,18 @@ ApplicationWindow {
             ? voicePageLoader.item : null
     }
 
+    function lexiconPage() {
+        return lexiconPageLoader.status === Loader.Ready
+            ? lexiconPageLoader.item : null
+    }
+
     function currentPageItem() {
         if (tabBar.currentIndex === 0)
             return devicePage
         if (tabBar.currentIndex === 1)
             return buttonsPage()
+        if (tabBar.currentIndex === 3)
+            return lexiconPage()
         return voicePage()
     }
 
@@ -100,7 +107,7 @@ ApplicationWindow {
     }
 
     function requestPage(index) {
-        if (index < 0 || index > 2 || index === tabBar.currentIndex
+        if (index < 0 || index > 3 || index === tabBar.currentIndex
                 || SettingsController.settingsSaveBusy
                 || unsavedExitDialog.exitCommitInProgress
                 || window.applicationExitInProgress)
@@ -623,7 +630,19 @@ ApplicationWindow {
                     checked: tabBar.currentIndex === 2
                     onPressed: window.requestPage(2)
                     Accessible.name: text
+                    KeyNavigation.tab: lexiconTabButton
                     KeyNavigation.backtab: mappingTabButton
+                }
+                NavButton {
+                    id: lexiconTabButton
+                    objectName: "lexiconTabButton"
+                    tokens: window.tokens
+                    text: qsTr("热词")
+                    iconName: "list"
+                    checked: tabBar.currentIndex === 3
+                    onPressed: window.requestPage(3)
+                    Accessible.name: text
+                    KeyNavigation.backtab: voiceTabButton
                 }
             }
 
@@ -631,7 +650,7 @@ ApplicationWindow {
             Rectangle {
                 id: navigationIndicator
                 objectName: "navigationIndicator"
-                readonly property Item target: [deviceTabButton, mappingTabButton, voiceTabButton][tabBar.currentIndex] || deviceTabButton
+                readonly property Item target: [deviceTabButton, mappingTabButton, voiceTabButton, lexiconTabButton][tabBar.currentIndex] || deviceTabButton
                 x: 0
                 y: navigationItems.y + target.y + 12
                 width: 3
@@ -914,7 +933,7 @@ ApplicationWindow {
                         DevicePage {
                             id: devicePage
                             tokens: window.tokens
-                            backTabTarget: voiceTabButton
+                            backTabTarget: lexiconTabButton
                             tabTarget: deviceTabButton
                             onOpenButtonsRequested: window.requestPage(1)
                         }
@@ -926,7 +945,7 @@ ApplicationWindow {
                                 ButtonsPage {
                                     enabled: !SettingsController.configurationReadOnly
                                     tokens: window.tokens
-                                    backTabTarget: voiceTabButton
+                                    backTabTarget: lexiconTabButton
                                     tabTarget: deviceTabButton
                                 }
                             }
@@ -939,10 +958,23 @@ ApplicationWindow {
                                 VoicePage {
                                     enabled: !SettingsController.configurationReadOnly
                                     tokens: window.tokens
-                                    backTabTarget: voiceTabButton
+                                    backTabTarget: lexiconTabButton
                                     tabTarget: deviceTabButton
                                     onOpenDeviceRequested: window.requestPage(0)
                                     onOpenButtonsRequested: window.requestPage(1)
+                                }
+                            }
+                        }
+                        Loader {
+                            id: lexiconPageLoader
+                            objectName: "lexiconPageLoader"
+                            active: tabBar.currentIndex === 3 || status === Loader.Ready
+                            sourceComponent: Component {
+                                LexiconPage {
+                                    enabled: !SettingsController.configurationReadOnly
+                                    tokens: window.tokens
+                                    backTabTarget: lexiconTabButton
+                                    tabTarget: deviceTabButton
                                 }
                             }
                         }

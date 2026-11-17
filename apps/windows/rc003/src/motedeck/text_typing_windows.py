@@ -54,3 +54,39 @@ def type_text(text: str) -> int:
                 )
         sent += int(user32.SendInput(len(array), array, ctypes.sizeof(win32_input.INPUT)))
     return sent
+
+
+_VK_BACK = 0x08
+
+
+def replace_text(old_characters: int, new_text: str) -> int:
+    """退格删掉刚打的 ``old_characters`` 个字，再打 ``new_text``。
+
+    调用方负责确认光标还在原处（前台窗口没变、期间没有别的输入）。
+    """
+
+    if sys.platform != "win32" or old_characters <= 0:
+        return 0
+    user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+    user32.SendInput.argtypes = (
+        ctypes.c_uint,
+        ctypes.POINTER(win32_input.INPUT),
+        ctypes.c_int,
+    )
+    user32.SendInput.restype = ctypes.c_uint
+    array = (win32_input.INPUT * (old_characters * 2))()
+    for index in range(old_characters):
+        for offset, flags in ((0, 0), (1, _KEYEVENTF_KEYUP)):
+            keybd = win32_input.KEYBDINPUT(
+                wVk=_VK_BACK,
+                wScan=0,
+                dwFlags=flags,
+                time=0,
+                dwExtraInfo=win32_input._INPUT_EVENT_EXTRA_INFO,
+            )
+            array[index * 2 + offset] = win32_input.INPUT(
+                type=_INPUT_KEYBOARD,
+                union=win32_input._INPUT_UNION(ki=keybd),
+            )
+    sent = int(user32.SendInput(len(array), array, ctypes.sizeof(win32_input.INPUT)))
+    return sent + type_text(new_text)

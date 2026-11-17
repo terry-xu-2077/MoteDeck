@@ -17,10 +17,17 @@ Item {
     property int titleWidth: 0
     property bool inlineLabel: false
     property int rowHeight: 48
+    // 说明文字最多显示几行（默认 1 行，超出省略）；>1 时自动换行
+    property int descriptionLines: 1
+    // 右侧开关/按钮与标题那一行垂直对齐（而不是在整块文字的正中间）；多行说明时更好看
+    property bool actionsAlignTitle: false
+    readonly property int topPadding: 10
     property string titleObjectName: ""
     // 标题右侧紧跟的内容（稿里语音页 .lbl 之后的 pill）
     property alias trailingData: trailingHolder.data
     default property alias actions: actionHolder.data
+    // 说明文字下面再放一行内容（比如一个次要按钮）
+    property alias belowData: belowHolder.data
 
     readonly property bool inlineMode: titleWidth > 0 || inlineLabel
 
@@ -68,7 +75,8 @@ Item {
         ColumnLayout {
             Layout.fillWidth: true
             Layout.minimumWidth: 0
-            Layout.alignment: Qt.AlignVCenter
+            Layout.alignment: root.actionsAlignTitle ? Qt.AlignTop : Qt.AlignVCenter
+            Layout.topMargin: root.actionsAlignTitle ? root.topPadding : 0
             spacing: 2
             visible: !root.inlineMode
 
@@ -92,9 +100,17 @@ Item {
                 lineHeight: 16
                 lineHeightMode: Text.FixedHeight
                 color: root.tokens.textTertiary
+                wrapMode: root.descriptionLines > 1 ? Text.Wrap : Text.NoWrap
+                maximumLineCount: Math.max(1, root.descriptionLines)
                 elide: Text.ElideRight
                 Layout.fillWidth: true
                 visible: text.length > 0
+            }
+            RowLayout {
+                id: belowHolder
+                Layout.topMargin: 4
+                spacing: 4
+                visible: children.length > 0
             }
         }
 
@@ -108,7 +124,10 @@ Item {
         RowLayout {
             id: actionHolder
             spacing: 4
-            Layout.alignment: Qt.AlignVCenter
+            Layout.alignment: root.actionsAlignTitle ? Qt.AlignTop : Qt.AlignVCenter
+            // 标题那一行的中线：上边距 + 行高的一半；控件按自己的高度居中到这条线上
+            Layout.topMargin: root.actionsAlignTitle
+                ? Math.max(0, root.topPadding + 9 - actionHolder.implicitHeight / 2) : 0
         }
     }
 

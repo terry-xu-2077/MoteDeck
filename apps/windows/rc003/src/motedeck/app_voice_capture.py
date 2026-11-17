@@ -9,6 +9,7 @@ from typing import Tuple
 from .voice_shortcut_session import _VOICE_HOTKEY_BACKEND_MARKED
 import array
 from . import bridge_runtime_status
+from . import candidate_popup_windows
 from . import capswriter_client
 from . import capswriter_postprocess
 from . import capswriter_service
@@ -21,6 +22,8 @@ from . import local_asr
 from . import local_microphone_windows
 import math
 import os
+import re
+import sys
 import threading
 import time
 from . import tsf_input_windows
@@ -597,6 +600,39 @@ class VoiceCaptureMixin:
             self._logger.warning(
                 "capswriter text typing failed: error_type=%s", type(exc).__name__
             )
+            return
+        self._offer_candidates(str(text), value)
+
+    def _offer_candidates(self, raw: str, typed: str) -> None:
+        """短词读音不确定时，在光标处弹候选菜单；选了别的就替换并记成别名。"""
+
+        lexicon = getattr(self._capswriter_postprocessor, "lexicon", None)
+        if lexicon is None or sys.platform != "win32":
+            return
+        try:
+            if not lexicon.popup_enabled() or lexicon.is_known_term(typed):
+                return
+            options = lexicon.candidates(typed)
+            if len(options) < 2:
+                return
+            window = candidate_popup_windows.foreground_window()
+            wrong = re.sub(r"[，。,.！？!?\s]+$", "", raw.strip()) or typed
+
+            def choose(index: int, choice: str) -> None:
+                if index <= 0:
+                    return
+                if candidate_popup_windows.foreground_window() != window:
+                    self._logger.info("candidate choice skipped: foreground window changed")
+                    return
+                text_typing_windows.replace_text(len(typed), choice)
+                lexicon.learn_choice(wrong, choice)
+
+            popup = getattr(self, "_capswriter_candidate_popup", None)
+            if popup is None:
+                popup = self._capswriter_candidate_popup = candidate_popup_windows.CandidatePopup()
+            popup.show(options, choose)
+        except BaseException as exc:  # noqa: BLE001 - 候选菜单不能影响输入
+            self._logger.warning("candidate offer failed: error_type=%s", type(exc).__name__)
 
     def _on_asr_result(self, text: str, error: Optional[str]) -> None:
         """识别线程回调：成功就把文字交给 OpenMexia 去执行。"""

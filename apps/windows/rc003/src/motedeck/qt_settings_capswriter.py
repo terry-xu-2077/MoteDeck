@@ -16,6 +16,7 @@ from . import capswriter_client
 from . import capswriter_models
 from . import capswriter_service as svc
 from . import voice_live
+from .qt_settings_lexicon import VoiceLexiconController
 from .qt_settings_qml_tokens import Property, QObject, QTimer, Signal, Slot
 
 _POLL_MS = 4000
@@ -41,6 +42,7 @@ class CapsWriterController(QObject):
         self._config_root = Path(config_root)
         self._settings = svc.migrate_existing(self._config_root, _app_dir())
         self._status = svc.status(self._settings, _app_dir())
+        self._lexicon = VoiceLexiconController(self._config_root, self)
         self._busy = False
         self._message = ""
         self._statusReady.connect(self._apply_status)
@@ -64,6 +66,8 @@ class CapsWriterController(QObject):
         self._live_timer.timeout.connect(self._tick_live)
         if self._settings.auto_start and self._status.found and not self._status.running:
             QTimer.singleShot(0, self.start)
+
+    lexicon = Property(QObject, lambda self: self._lexicon, constant=True)
 
     # -- properties --
     def _s(self):
