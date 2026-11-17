@@ -16,7 +16,6 @@ Item {
     readonly property int deviceStateColumnWidth: 96
     readonly property int deviceActionColumnWidth: tokens.buttonWidth4Chars
     signal openButtonsRequested()
-    signal openVoiceRequested()
 
     function restoreLogExportFocus() {
         Qt.callLater(function() {
@@ -780,6 +779,11 @@ Item {
                     descriptionText: qsTr("连接遥控器，接收按键和语音")
                     stateText: root.bridgeStateText()
                     stateColor: root.bridgeStateColor()
+                    pillOk: SettingsController.bridgeRunning
+                        && Qt.colorEqual(root.bridgeStateColor(), root.tokens.successColor)
+                    pillText: pillOk ? qsTr("运行中")
+                        : (SettingsController.bridgeRunning ? root.bridgeStateText() : qsTr("未运行"))
+                    pillDotColor: root.bridgeStateColor()
 
                     CompactButton {
                         objectName: "stopBridgeButton"
@@ -790,7 +794,7 @@ Item {
                         tokens: root.tokens
                         flat: true
                         text: SettingsController.bridgeLaunchPhase === "stopping"
-                            ? qsTr("停止中…") : qsTr("关闭服务")
+                            ? qsTr("停止中…") : qsTr("停止服务")
                         enabled: SettingsController.bridgeLaunchPhase !== "stopping"
                             && !SettingsController.bridgeLaunchBusy
                             && !SettingsController.configurationReadOnly
@@ -840,9 +844,14 @@ Item {
                     stateText: CapsWriterController.stateText
                     stateColor: CapsWriterController.running
                         ? root.tokens.successColor : root.tokens.textTertiary
+                    pillOk: CapsWriterController.running
+                    pillText: CapsWriterController.running ? qsTr("运行中")
+                        : (CapsWriterController.found ? qsTr("未运行") : qsTr("未找到"))
+                    pillDotColor: root.tokens.textTertiary
 
                     CompactButton {
                         id: capsWriterToggleTileButton
+                        KeyNavigation.tab: launchAtLoginSwitch
                         objectName: "capsWriterToggleTileButton"
                         visible: CapsWriterController.found
                         tokens: root.tokens
@@ -852,13 +861,6 @@ Item {
                             : (CapsWriterController.running ? qsTr("停止服务") : qsTr("启动服务"))
                         onClicked: CapsWriterController.running
                             ? CapsWriterController.stop() : CapsWriterController.start()
-                    }
-                    CompactButton {
-                        objectName: "capsWriterSettingsButton"
-                        tokens: root.tokens
-                        text: qsTr("设置")
-                        KeyNavigation.tab: launchAtLoginSwitch
-                        onClicked: root.openVoiceRequested()
                     }
                 }
             }
@@ -1092,6 +1094,10 @@ Item {
         property string stateText: ""
         property color stateColor: tokens.successColor
         property bool focusTile: false
+        // 右下角运行状态胶囊（与“当前设备”的已连接胶囊同款）
+        property string pillText: ""
+        property bool pillOk: false
+        property color pillDotColor: "transparent"
         default property alias actions: tileActions.data
 
         implicitHeight: 119
@@ -1169,9 +1175,25 @@ Item {
                 color: tokens.textTertiary
                 elide: Text.ElideRight
                 Layout.fillWidth: true
+                Layout.rightMargin: statePill.visible ? statePill.width + 8 : 0
             }
 
             Item { Layout.fillHeight: true }
+        }
+
+        StatusPill {
+            id: statePill
+            objectName: tile.objectName.length > 0
+                ? tile.objectName + "_statePill" : ""
+            tokens: tile.tokens
+            visible: tile.pillText.length > 0
+            ok: tile.pillOk
+            label: tile.pillText
+            dotColor: tile.pillOk ? "transparent" : tile.pillDotColor
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 12
         }
     }
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from . import __version__
 from . import app_icons
 from . import app_profiles
-from . import application_update
+from . import project_links
 from . import audio_output
 from . import bridge_control_windows
 from . import bridge_launcher
@@ -19,7 +19,6 @@ from . import dev_session
 from . import device_catalog
 from . import element_navigation_control_windows
 from . import frida_compat
-from . import hid_elevation_windows
 from . import hotkey
 from . import hotkey_capture_windows
 from . import key_detection_bridge
@@ -178,9 +177,6 @@ class SettingsController(QObject):
     inputCleanupReady = Signal()
     inputCleanupFailed = Signal(str)
     saveSettingsAndExitFinished = Signal(bool)
-    applicationUpdateChanged = Signal()
-    applicationUpdateDialogRequested = Signal()
-    applicationUpdateNotificationRequested = Signal(str)
     logExportBusyChanged = Signal()
     _logExportReady = Signal(object)
     _hotkeyCaptureResult = Signal(object)
@@ -191,9 +187,6 @@ class SettingsController(QObject):
     _applicationExitStopReady = Signal(object)
     _bridgeRestartStopReady = Signal(object)
     _bridgeStopReady = Signal(object)
-    _applicationUpdateCheckReady = Signal(object)
-    _applicationUpdateDownloadReady = Signal(object)
-    _applicationUpdateProgressReady = Signal(object)
     asrModelStateChanged = Signal()
     _asrModelInstallReady = Signal(object)
 
@@ -231,27 +224,11 @@ class SettingsController(QObject):
         self._background_threads_lock = threading.RLock()
         self._log_export_busy = False
         self._logExportReady.connect(self._on_log_export_ready)
-        self._applicationUpdateCheckReady.connect(
-            self._on_application_update_check_ready
-        )
-        self._applicationUpdateDownloadReady.connect(
-            self._on_application_update_download_ready
-        )
-        self._applicationUpdateProgressReady.connect(
-            self._on_application_update_progress_ready
-        )
         self._asrModelInstallReady.connect(self._on_asr_model_install_ready)
         self._asr_model_busy = False
         self._input_worker_result_lock = threading.Lock()
         self._input_worker_result = None
         self._config_root = config.config_root()
-        application_update.cleanup_obsolete_update_downloads(
-            self._config_root / "updates",
-            __version__,
-        )
-        self._hid_helper_installed_distribution = (
-            hid_elevation_windows.is_installed_distribution()
-        )
         self._config, self._bindings, self._configuration_issues = (
             config.load_window_settings(self._config_root)
         )
@@ -468,21 +445,6 @@ class SettingsController(QObject):
         removed_windows_dictation = bool(
             self._config.get(config.RUNTIME_REMOVED_WINDOWS_DICTATION_KEY)
         )
-        self._application_update_state = "idle"
-        self._application_update_message = ""
-        self._application_update_release_notes = ""
-        self._application_update_release_url = application_update.RELEASES_PAGE_URL
-        self._application_update_release = None
-        self._application_update_available = False
-        self._application_update_check_busy = False
-        self._application_update_check_silent = False
-        self._application_update_startup_attempted = False
-        self._application_update_download_busy = False
-        self._application_update_download_cancel_event = None
-        self._application_update_package_name = ""
-        self._application_update_package_size = 0
-        self._application_update_download_received = 0
-        self._application_update_download_path = ""
         self._settings_dirty = bool(self._removed_voice_bindings) and not self.configurationReadOnly
         self._mapping_dirty = bool(self._removed_voice_bindings) and not self.configurationReadOnly
         self._settings_revision = 0
@@ -705,9 +667,6 @@ class SettingsController(QObject):
         self._endpoint_options_refresh_pending = False
         self._endpoint_preflight_token += 1
         self._endpoint_preflight_completion = None
-        cancel_event = self._application_update_download_cancel_event
-        if cancel_event is not None:
-            cancel_event.set()
 
         deadline = time.monotonic() + _SETTINGS_BACKGROUND_JOIN_TIMEOUT_SECONDS
         current_thread = threading.current_thread()
@@ -5180,7 +5139,6 @@ class SettingsController(QObject):
         notify=endpointPreflightBusyChanged,
     )
 
-
     def _get_endpoint_options(self) -> List[str]:
         return list(self._endpoint_options)
 
@@ -5477,118 +5435,6 @@ class SettingsController(QObject):
         str,
         lambda self: __version__,
         constant=True,
-    )
-    applicationUpdateState = Property(
-        str,
-        lambda self: self._application_update_state,
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdateMessage = Property(
-        str,
-        lambda self: self._application_update_message,
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdateLatestVersion = Property(
-        str,
-        lambda self: (
-            self._application_update_release.version.text
-            if self._application_update_release is not None
-            else ""
-        ),
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdateReleaseNotes = Property(
-        str,
-        lambda self: self._application_update_release_notes,
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdateReleaseUrl = Property(
-        str,
-        lambda self: self._application_update_release_url,
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdatePackageName = Property(
-        str,
-        lambda self: self._application_update_package_name,
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdatePackageSize = Property(
-        int,
-        lambda self: self._application_update_package_size,
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdatePackageSizeText = Property(
-        str,
-        lambda self: application_update.format_file_size(
-            self._application_update_package_size
-        ),
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdatePackageKindText = Property(
-        str,
-        lambda self: (
-            "安装器"
-            if self._application_update_package_kind()
-            is application_update.PackageKind.INSTALLER
-            else "便携版 ZIP"
-        ),
-        constant=True,
-    )
-    applicationUpdateCheckBusy = Property(
-        bool,
-        lambda self: self._application_update_check_busy,
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdateDownloadBusy = Property(
-        bool,
-        lambda self: self._application_update_download_busy,
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdateBusy = Property(
-        bool,
-        lambda self: (
-            self._application_update_check_busy
-            or self._application_update_download_busy
-        ),
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdateCanDownload = Property(
-        bool,
-        lambda self: (
-            self._application_update_available
-            and self._application_update_release is not None
-            and not self._application_update_check_busy
-            and not self._application_update_download_busy
-        ),
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdateDownloadProgress = Property(
-        float,
-        lambda self: (
-            min(
-                1.0,
-                self._application_update_download_received
-                / self._application_update_package_size,
-            )
-            if self._application_update_package_size > 0
-            else 0.0
-        ),
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdateDownloadProgressText = Property(
-        str,
-        lambda self: (
-            f"{application_update.format_file_size(self._application_update_download_received)}"
-            f" / {application_update.format_file_size(self._application_update_package_size)}"
-            if self._application_update_package_size > 0
-            else ""
-        ),
-        notify=applicationUpdateChanged,
-    )
-    applicationUpdateDownloadedPath = Property(
-        str,
-        lambda self: self._application_update_download_path,
-        notify=applicationUpdateChanged,
     )
 
     def _get_device_catalog_available(self) -> bool:
@@ -7858,26 +7704,26 @@ class SettingsController(QObject):
     @Slot(result=bool)
     def openUsageGuide(self) -> bool:
         result = shell_targets.open_external_target(
-            application_update.WEBSITE_GUIDE_URL
+            project_links.WEBSITE_GUIDE_URL
         )
         self._report_external_target(result, self._DEVICE_PAGE_INDEX)
         return result.outcome is shell_targets.ExternalTargetOutcome.OPENED
 
     @Slot(result=bool)
     def openWebsite(self) -> bool:
-        result = shell_targets.open_external_target(application_update.WEBSITE_URL)
+        result = shell_targets.open_external_target(project_links.WEBSITE_URL)
         self._report_external_target(result, self._DEVICE_PAGE_INDEX)
         return result.outcome is shell_targets.ExternalTargetOutcome.OPENED
 
     @Slot(result=bool)
     def openAuthorPage(self) -> bool:
-        result = shell_targets.open_external_target(application_update.AUTHOR_URL)
+        result = shell_targets.open_external_target(project_links.AUTHOR_URL)
         self._report_external_target(result, self._DEVICE_PAGE_INDEX)
         return result.outcome is shell_targets.ExternalTargetOutcome.OPENED
 
     @Slot(result=bool)
     def openLicense(self) -> bool:
-        result = shell_targets.open_external_target(application_update.LICENSE_URL)
+        result = shell_targets.open_external_target(project_links.LICENSE_URL)
         self._report_external_target(result, self._DEVICE_PAGE_INDEX)
         return result.outcome is shell_targets.ExternalTargetOutcome.OPENED
 
@@ -7888,7 +7734,7 @@ class SettingsController(QObject):
 
     @Slot(result=bool)
     def openLogLocation(self) -> bool:
-        if self._application_update_operation_blocked():
+        if self._shutdown_blocked():
             return False
         result = logging_setup.open_log_location(self._config_root)
         self._set_error_message('')
@@ -7904,7 +7750,7 @@ class SettingsController(QObject):
 
     @Slot(str, result=bool)
     def exportLogs(self, selected_file: str) -> bool:
-        if self._log_export_busy or self._application_update_operation_blocked():
+        if self._log_export_busy or self._shutdown_blocked():
             return False
         if not selected_file:
             return False
@@ -7944,408 +7790,13 @@ class SettingsController(QObject):
             self._set_status_message('')
             self._set_error_message(message, self._DEVICE_PAGE_INDEX)
 
-    def _application_update_operation_blocked(self) -> bool:
+    def _shutdown_blocked(self) -> bool:
         return bool(
             self._background_shutdown_event.is_set()
             or self._application_exit_requested
             or self._application_exit_intent.is_set()
             or self._application_exit_confirmed
         )
-
-    def _application_update_result_discarded(self) -> bool:
-        return bool(
-            self._background_shutdown_event.is_set()
-            or self._application_exit_confirmed
-        )
-
-    def _application_update_package_kind(self):
-        release = self._application_update_release
-        if release is not None:
-            if (
-                self._hid_helper_installed_distribution
-                and release.installer is not None
-            ):
-                return application_update.PackageKind.INSTALLER
-            if release.portable is not None:
-                return application_update.PackageKind.PORTABLE
-            if release.installer is not None:
-                return application_update.PackageKind.INSTALLER
-        return (
-            application_update.PackageKind.INSTALLER
-            if self._hid_helper_installed_distribution
-            else application_update.PackageKind.PORTABLE
-        )
-
-    def _set_application_update_release(self, release) -> None:
-        self._application_update_release = release
-        self._application_update_release_url = release.release_url
-        self._application_update_release_notes = (
-            release.notes or "暂无更新说明。"
-        )
-        package = release.package_for(self._application_update_package_kind())
-        self._application_update_package_name = package.name
-        self._application_update_package_size = package.size
-        self._application_update_download_received = 0
-        self._application_update_download_path = ""
-
-    @Slot(result=bool)
-    def checkForApplicationUpdate(self) -> bool:
-        return self._start_application_update_check(silent=False)
-
-    @Slot(result=bool)
-    def checkForApplicationUpdateOnStartup(self) -> bool:
-        if self._application_update_startup_attempted:
-            return False
-        self._application_update_startup_attempted = True
-        # Never clear a result or download initiated by the user before the
-        # delayed startup check. The next application start can try again.
-        if self._application_update_state != "idle":
-            return False
-        return self._start_application_update_check(silent=True)
-
-    @Slot(result=bool)
-    def showApplicationUpdate(self) -> bool:
-        if self._application_update_operation_blocked():
-            return False
-        self.applicationUpdateDialogRequested.emit()
-        return True
-
-    def _start_application_update_check(self, *, silent: bool) -> bool:
-        if not APPLICATION_UPDATE_CHECK_ENABLED:
-            if not silent:
-                self._set_error_message("")
-                self._set_status_message(
-                    "本特别版已停用更新检查。", self._DEVICE_PAGE_INDEX
-                )
-            return False
-        if (
-            self._application_update_check_busy
-            or self._application_update_download_busy
-            or self._application_update_operation_blocked()
-        ):
-            return False
-
-        self._application_update_check_busy = True
-        self._application_update_check_silent = silent
-        self._application_update_available = False
-        self._application_update_state = "checking"
-        self._application_update_message = "正在检查 GitHub 更新…"
-        self._application_update_release_notes = ""
-        self._application_update_release_url = application_update.RELEASES_PAGE_URL
-        self._application_update_release = None
-        self._application_update_package_name = ""
-        self._application_update_package_size = 0
-        self._application_update_download_received = 0
-        self._application_update_download_path = ""
-        if not silent:
-            self._set_error_message("")
-            self._set_status_message(
-                "正在检查 GitHub 更新…", self._DEVICE_PAGE_INDEX
-            )
-        self.applicationUpdateChanged.emit()
-
-        def run() -> None:
-            try:
-                if silent and not application_update.claim_daily_update_check(
-                    self._config_root / "updates"
-                ):
-                    result = None
-                else:
-                    result = application_update.check_for_update(__version__)
-                payload = (True, result)
-            except application_update.ApplicationUpdateError as exc:
-                payload = (False, exc)
-            except Exception:  # noqa: BLE001 - keep remote errors sanitized
-                payload = (
-                    False,
-                    application_update.ApplicationUpdateError(
-                        "unexpected", "检查更新失败，请稍后重试。"
-                    ),
-                )
-            self._emit_background_result(
-                self._applicationUpdateCheckReady, payload
-            )
-
-        try:
-            self._start_background_task(run, "remote-mic-update-check")
-        except Exception:
-            self._application_update_check_busy = False
-            self._application_update_check_silent = False
-            if silent:
-                self._application_update_state = "idle"
-                self._application_update_message = ""
-                self.applicationUpdateChanged.emit()
-                return False
-            self._application_update_state = "check_error"
-            self._application_update_message = "无法启动更新检查后台任务。"
-            self._set_status_message("")
-            self._set_error_message(
-                self._application_update_message, self._DEVICE_PAGE_INDEX
-            )
-            self.applicationUpdateChanged.emit()
-            self.applicationUpdateDialogRequested.emit()
-            return False
-        return True
-
-    def _on_application_update_check_ready(self, payload: object) -> None:
-        if self._application_update_result_discarded():
-            return
-        succeeded, value = payload
-        silent = self._application_update_check_silent
-        self._application_update_check_silent = False
-        self._application_update_check_busy = False
-        if silent and (
-            not succeeded or value is None
-            or value.outcome is not application_update.UpdateCheckOutcome.UPDATE_AVAILABLE
-        ):
-            self._application_update_state = "idle"
-            self._application_update_message = ""
-            self.applicationUpdateChanged.emit()
-            return
-        if not succeeded:
-            self._application_update_available = False
-            self._application_update_state = "check_error"
-            self._application_update_message = str(value)
-            self._set_status_message("")
-            self._set_error_message(
-                f"检查更新失败：{value}", self._DEVICE_PAGE_INDEX
-            )
-            self.applicationUpdateChanged.emit()
-            if not self._application_update_operation_blocked():
-                self.applicationUpdateDialogRequested.emit()
-            return
-
-        result = value
-        self._set_application_update_release(result.release)
-        if not silent:
-            self._set_error_message("")
-        if (
-            result.outcome
-            is application_update.UpdateCheckOutcome.UPDATE_AVAILABLE
-        ):
-            self._application_update_available = True
-            self._application_update_state = "available"
-            self._application_update_message = (
-                f"发现新版本 {result.release.version.text}。"
-            )
-        elif result.outcome is application_update.UpdateCheckOutcome.CURRENT:
-            self._application_update_available = False
-            self._application_update_state = "current"
-            self._application_update_message = "当前已是最新版本。"
-        else:
-            self._application_update_available = False
-            self._application_update_state = "local_newer"
-            self._application_update_message = (
-                "当前版本比 GitHub 上可下载的版本更新。"
-            )
-        if not silent:
-            self._set_status_message(
-                self._application_update_message, self._DEVICE_PAGE_INDEX
-            )
-        self.applicationUpdateChanged.emit()
-        if not self._application_update_operation_blocked():
-            if silent:
-                self.applicationUpdateNotificationRequested.emit(
-                    f"发现新版本 {result.release.version.text}，点击查看并下载。"
-                )
-            else:
-                self.applicationUpdateDialogRequested.emit()
-
-    @Slot(result=bool)
-    def downloadApplicationUpdate(self) -> bool:
-        if (
-            not self._application_update_available
-            or self._application_update_release is None
-            or self._application_update_check_busy
-            or self._application_update_download_busy
-            or self._application_update_operation_blocked()
-        ):
-            return False
-
-        release = self._application_update_release
-        package_kind = self._application_update_package_kind()
-        desktop = QStandardPaths.writableLocation(QStandardPaths.DesktopLocation)
-        cancel_event = threading.Event()
-        self._application_update_download_cancel_event = cancel_event
-        self._application_update_download_busy = True
-        self._application_update_state = "downloading"
-        self._application_update_message = (
-            f"正在下载{self.applicationUpdatePackageKindText}…"
-        )
-        self._application_update_download_received = 0
-        self._application_update_download_path = ""
-        self._set_error_message("")
-        self._set_status_message(
-            self._application_update_message, self._DEVICE_PAGE_INDEX
-        )
-        self.applicationUpdateChanged.emit()
-
-        def report_progress(received: int, total: int) -> None:
-            if not self._emit_background_result(
-                self._applicationUpdateProgressReady,
-                (int(received), int(total)),
-            ):
-                cancel_event.set()
-
-        def run() -> None:
-            try:
-                application_update.cleanup_obsolete_update_downloads(
-                    self._config_root / "updates",
-                    release.version,
-                    include_current=False,
-                )
-                result = application_update.download_update_package(
-                    release,
-                    package_kind,
-                    self._config_root / "updates" / release.version.text,
-                    cancel_event=cancel_event,
-                    progress_callback=report_progress,
-                )
-                if not desktop:
-                    raise application_update.ApplicationUpdateError(
-                        "desktop_unavailable", "无法找到桌面，更新包保留在下载缓存中，请稍后重试。"
-                    )
-                result = application_update.save_update_to_desktop(
-                    result, Path(desktop), cancel_event=cancel_event
-                )
-                payload = (True, result)
-            except application_update.ApplicationUpdateCancelled as exc:
-                payload = (False, exc)
-            except application_update.ApplicationUpdateError as exc:
-                payload = (False, exc)
-            except Exception:  # noqa: BLE001 - keep remote errors sanitized
-                payload = (
-                    False,
-                    application_update.ApplicationUpdateError(
-                        "unexpected", "下载更新包失败，请稍后重试。"
-                    ),
-                )
-            self._emit_background_result(
-                self._applicationUpdateDownloadReady, payload
-            )
-
-        try:
-            self._start_background_task(run, "remote-mic-update-download")
-        except Exception:
-            cancel_event.set()
-            self._application_update_download_cancel_event = None
-            self._application_update_download_busy = False
-            self._application_update_state = "download_error"
-            self._application_update_message = "无法启动更新下载后台任务。"
-            self._set_status_message("")
-            self._set_error_message(
-                self._application_update_message, self._DEVICE_PAGE_INDEX
-            )
-            self.applicationUpdateChanged.emit()
-            return False
-        return True
-
-    def _on_application_update_progress_ready(self, payload: object) -> None:
-        if (
-            not self._application_update_download_busy
-            or self._application_update_result_discarded()
-        ):
-            return
-        received, total = payload
-        if int(total) != self._application_update_package_size:
-            return
-        self._application_update_download_received = max(
-            0, min(int(received), self._application_update_package_size)
-        )
-        self.applicationUpdateChanged.emit()
-
-    def _on_application_update_download_ready(self, payload: object) -> None:
-        if self._application_update_result_discarded():
-            return
-        succeeded, value = payload
-        self._application_update_download_busy = False
-        self._application_update_download_cancel_event = None
-        if not succeeded:
-            if isinstance(
-                value, application_update.ApplicationUpdateCancelled
-            ):
-                self._application_update_state = "available"
-                self._application_update_message = "下载已取消，可以稍后重试。"
-                self._set_error_message("")
-                self._set_status_message(
-                    self._application_update_message, self._DEVICE_PAGE_INDEX
-                )
-            else:
-                self._application_update_state = "download_error"
-                self._application_update_message = str(value)
-                self._set_status_message("")
-                self._set_error_message(
-                    f"下载更新失败：{value}", self._DEVICE_PAGE_INDEX
-                )
-            self.applicationUpdateChanged.emit()
-            return
-
-        result = value
-        self._application_update_available = False
-        self._application_update_state = "downloaded"
-        self._application_update_download_received = (
-            self._application_update_package_size
-        )
-        self._application_update_download_path = str(result.path)
-        if result.package_kind is application_update.PackageKind.INSTALLER:
-            self._application_update_message = (
-                "更新包已保存到桌面并通过校验。请先完全退出MoteDeck，再在文件夹中"
-                "手动运行安装器；程序不会自动安装。"
-            )
-        else:
-            self._application_update_message = (
-                "便携版已保存到桌面并通过校验。请先完全退出当前版本，再解压到"
-                "新的文件夹使用；程序不会覆盖现有目录。"
-            )
-        self._set_error_message("")
-        self._set_status_message(
-            "更新包已保存到桌面并通过校验。", self._DEVICE_PAGE_INDEX
-        )
-        self.applicationUpdateChanged.emit()
-
-    @Slot(result=bool)
-    def cancelApplicationUpdateDownload(self) -> bool:
-        cancel_event = self._application_update_download_cancel_event
-        if not self._application_update_download_busy or cancel_event is None:
-            return False
-        cancel_event.set()
-        self._application_update_message = "正在取消下载…"
-        self.applicationUpdateChanged.emit()
-        return True
-
-    @Slot(result=bool)
-    def openApplicationUpdateRelease(self) -> bool:
-        target = self._application_update_release_url
-        result = shell_targets.open_external_target(target)
-        self._report_external_target(result, self._DEVICE_PAGE_INDEX)
-        return result.outcome is shell_targets.ExternalTargetOutcome.OPENED
-
-    @Slot(result=bool)
-    def openDownloadedApplicationUpdate(self) -> bool:
-        package_path = (
-            Path(self._application_update_download_path)
-            if self._application_update_download_path
-            else None
-        )
-        if package_path is None or not package_path.is_file():
-            self._application_update_available = (
-                self._application_update_release is not None
-            )
-            self._application_update_state = "download_error"
-            self._application_update_message = (
-                "已下载的更新包不存在，请重新下载。"
-            )
-            self._application_update_download_received = 0
-            self._application_update_download_path = ""
-            self._set_status_message("")
-            self._set_error_message(
-                self._application_update_message, self._DEVICE_PAGE_INDEX
-            )
-            self.applicationUpdateChanged.emit()
-            return False
-        result = shell_targets.open_external_target(str(package_path.parent))
-        self._report_external_target(result, self._DEVICE_PAGE_INDEX)
-        return result.outcome is shell_targets.ExternalTargetOutcome.OPENED
 
     @Slot(str)
     def selectButton(self, button_id: str) -> None:

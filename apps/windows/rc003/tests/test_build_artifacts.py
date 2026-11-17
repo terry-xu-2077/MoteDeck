@@ -3275,14 +3275,14 @@ class RealWindowsCiEvidenceContractTests(unittest.TestCase):
         self.assertNotIn("已通过真实硬件验收", guide)
 
 
-class ApplicationUpdateDocumentationContractTests(unittest.TestCase):
-    def test_manual_update_never_auto_replaces_the_running_copy(self):
+class UpgradeDocumentationContractTests(unittest.TestCase):
+    def test_upgrade_is_manual_and_the_app_does_not_check_for_updates(self):
         guide = _README_PATH.read_text(encoding="utf-8")
         landing = _ROOT_README_PATH.read_text(encoding="utf-8")
         self.assertIn("[使用说明](apps/windows/rc003/README.md)", landing)
-        self.assertIn("检查更新", guide)
-        self.assertIn("不会自动运行下载文件或覆盖当前安装", guide)
-        self.assertIn("再运行新下载的安装包", guide)
+        self.assertIn("程序本身不联网检查更新", guide)
+        self.assertNotIn("“检查更新”", guide)
+        self.assertIn("再手动运行新下载的安装包", guide)
 
 
 class PortableAndInstallerFlowContractTests(unittest.TestCase):

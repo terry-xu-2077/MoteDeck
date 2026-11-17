@@ -199,15 +199,6 @@ ApplicationWindow {
         if (SettingsController.startHidden)
             window.hide()
         SettingsController.startBridgeOnApplicationStart()
-        startupUpdateTimer.start()
-    }
-
-    Timer {
-        id: startupUpdateTimer
-        objectName: "startupUpdateTimer"
-        interval: 5000
-        repeat: false
-        onTriggered: SettingsController.checkForApplicationUpdateOnStartup()
     }
 
     onClosing: function(close) {
@@ -285,16 +276,6 @@ ApplicationWindow {
             window.lifecycleErrorTitle = qsTr("无法隐藏窗口")
             window.applicationExitError = message
             exitFailedDialog.open()
-        }
-        function onApplicationUpdateDialogRequested() {
-            const returnFocus = window.activeFocusItem
-            window.restoreWindow()
-            applicationUpdateDialog.returnFocusItem = returnFocus
-            applicationUpdateDialog.open()
-        }
-        function onApplicationUpdateNotificationRequested(message) {
-            systemTrayIcon.showMessage(SettingsController.applicationDisplayName,
-                message, Platform.SystemTrayIcon.Information)
         }
     }
 
@@ -377,201 +358,6 @@ ApplicationWindow {
                 color: window.tokens.textSecondary
                 text: qsTr("将覆盖「%1」当前的按键映射")
                     .arg(window.mappingImportTargetName)
-            }
-        }
-    }
-
-    SettingsDialog {
-        id: applicationUpdateDialog
-        tokens: window.tokens
-        objectName: "applicationUpdateDialog"
-        property var returnFocusItem: null
-        anchors.centerIn: parent
-        modal: true
-        popupType: Popup.Item
-        title: SettingsController.applicationUpdateState === "available"
-            ? qsTr("发现新版本")
-            : SettingsController.applicationUpdateState === "downloading"
-                ? qsTr("正在下载更新")
-                : SettingsController.applicationUpdateState === "downloaded"
-                    ? qsTr("更新包已下载")
-                    : SettingsController.applicationUpdateState === "download_error"
-                        ? qsTr("下载更新失败")
-                    : SettingsController.applicationUpdateState === "local_newer"
-                        ? qsTr("当前版本较新")
-                        : SettingsController.applicationUpdateState === "current"
-                            ? qsTr("已是最新版") : qsTr("检查更新失败")
-        standardButtons: Dialog.NoButton
-        dismissalEnabled: !SettingsController.applicationUpdateDownloadBusy
-        width: Math.min(500, window.width - 32)
-        onClosed: {
-            const target = returnFocusItem
-            returnFocusItem = null
-            if (target)
-                Qt.callLater(function() {
-                    Qt.callLater(function() {
-                        if (target.visible && target.enabled)
-                            target.forceActiveFocus(Qt.TabFocusReason)
-                    })
-                })
-        }
-
-        contentItem: ColumnLayout {
-            spacing: window.tokens.spacingMedium
-
-            UiLabel {
-                objectName: "applicationUpdateMessage"
-                tokens: window.tokens
-                kind: bodyKind
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                text: SettingsController.applicationUpdateMessage
-                color: SettingsController.applicationUpdateState === "check_error"
-                    || SettingsController.applicationUpdateState === "download_error"
-                    ? window.tokens.errorColor : window.tokens.textPrimary
-            }
-
-            UiLabel {
-                objectName: "applicationUpdateVersionSummary"
-                visible: SettingsController.applicationUpdateLatestVersion.length > 0
-                tokens: window.tokens
-                kind: noteKind
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                text: qsTr("当前版本：%1\nGitHub 版本：%2")
-                    .arg(SettingsController.applicationVersion)
-                    .arg(SettingsController.applicationUpdateLatestVersion)
-            }
-
-            UiLabel {
-                objectName: "applicationUpdatePackageSummary"
-                visible: SettingsController.applicationUpdatePackageSize > 0
-                    && (SettingsController.applicationUpdateState === "available"
-                        || SettingsController.applicationUpdateState === "downloading"
-                        || SettingsController.applicationUpdateState === "download_error"
-                        || SettingsController.applicationUpdateState === "downloaded")
-                tokens: window.tokens
-                kind: noteKind
-                Layout.fillWidth: true
-                wrapMode: Text.WordWrap
-                text: qsTr("下载内容：%1，%2")
-                    .arg(SettingsController.applicationUpdatePackageKindText)
-                    .arg(SettingsController.applicationUpdatePackageSizeText)
-            }
-
-            UiLabel {
-                visible: applicationUpdateNotes.visible
-                tokens: window.tokens
-                kind: noteKind
-                Layout.fillWidth: true
-                text: qsTr("更新说明")
-                font.weight: Font.Medium
-            }
-
-            ScrollView {
-                id: applicationUpdateNotes
-                objectName: "applicationUpdateNotes"
-                visible: SettingsController.applicationUpdateReleaseNotes.length > 0
-                    && SettingsController.applicationUpdateState !== "check_error"
-                Layout.fillWidth: true
-                Layout.preferredHeight: 118
-                clip: true
-
-                TextArea {
-                    width: applicationUpdateNotes.availableWidth
-                    readOnly: true
-                    selectByMouse: true
-                    wrapMode: TextEdit.Wrap
-                    textFormat: TextEdit.PlainText
-                    text: SettingsController.applicationUpdateReleaseNotes
-                    font.family: window.tokens.fontFamily
-                    font.pixelSize: window.tokens.fontSizeSmall
-                    color: window.tokens.textPrimary
-                    background: Rectangle {
-                        color: window.tokens.fieldBackground
-                        border.width: window.tokens.hairlineWidth
-                        border.color: window.tokens.border
-                        radius: window.tokens.cornerRadiusControl
-                    }
-                }
-            }
-
-            ProgressBar {
-                id: applicationUpdateProgress
-                objectName: "applicationUpdateProgress"
-                visible: SettingsController.applicationUpdateDownloadBusy
-                    || SettingsController.applicationUpdateState === "downloaded"
-                Layout.fillWidth: true
-                from: 0
-                to: 1
-                value: SettingsController.applicationUpdateDownloadProgress
-            }
-
-            UiLabel {
-                objectName: "applicationUpdateProgressText"
-                visible: applicationUpdateProgress.visible
-                tokens: window.tokens
-                kind: noteKind
-                Layout.fillWidth: true
-                horizontalAlignment: Text.AlignRight
-                text: SettingsController.applicationUpdateDownloadProgressText
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: window.tokens.spacingSmall
-                Item { Layout.fillWidth: true }
-
-                CompactButton {
-                    objectName: "closeApplicationUpdateButton"
-                    visible: !SettingsController.applicationUpdateDownloadBusy
-                    tokens: window.tokens
-                    text: SettingsController.applicationUpdateState === "available"
-                        ? qsTr("稍后") : qsTr("关闭")
-                    flat: SettingsController.applicationUpdateState === "available"
-                    onClicked: applicationUpdateDialog.close()
-                }
-
-                CompactButton {
-                    objectName: "openApplicationUpdateReleaseButton"
-                    visible: !SettingsController.applicationUpdateDownloadBusy
-                        && SettingsController.applicationUpdateState !== "downloaded"
-                    tokens: window.tokens
-                    text: qsTr("发布页")
-                    onClicked: SettingsController.openApplicationUpdateRelease()
-                }
-
-                CompactButton {
-                    objectName: "cancelApplicationUpdateDownloadButton"
-                    visible: SettingsController.applicationUpdateDownloadBusy
-                    tokens: window.tokens
-                    text: qsTr("取消下载")
-                    enabled: SettingsController.applicationUpdateMessage
-                        !== qsTr("正在取消下载…")
-                    onClicked: SettingsController.cancelApplicationUpdateDownload()
-                }
-
-                CompactButton {
-                    objectName: "downloadApplicationUpdateButton"
-                    visible: SettingsController.applicationUpdateCanDownload
-                    tokens: window.tokens
-                    text: SettingsController.applicationUpdateState === "download_error"
-                        ? qsTr("重新下载") : qsTr("下载更新")
-                    highlighted: true
-                    onClicked: SettingsController.downloadApplicationUpdate()
-                }
-
-                CompactButton {
-                    objectName: "openDownloadedApplicationUpdateButton"
-                    visible: SettingsController.applicationUpdateState === "downloaded"
-                    tokens: window.tokens
-                    text: qsTr("打开桌面")
-                    highlighted: true
-                    onClicked: {
-                        if (SettingsController.openDownloadedApplicationUpdate())
-                            applicationUpdateDialog.close()
-                    }
-                }
             }
         }
     }
@@ -680,7 +466,6 @@ ApplicationWindow {
         visible: true
         icon.source: SettingsController.trayIconSource
         tooltip: SettingsController.trayTooltip
-        onMessageClicked: SettingsController.showApplicationUpdate()
         onActivated: function(reason) {
             if (reason !== Platform.SystemTrayIcon.Context)
                 window.restoreWindow()
@@ -1132,7 +917,6 @@ ApplicationWindow {
                             backTabTarget: voiceTabButton
                             tabTarget: deviceTabButton
                             onOpenButtonsRequested: window.requestPage(1)
-                            onOpenVoiceRequested: window.requestPage(2)
                         }
                         Loader {
                             id: buttonsPageLoader

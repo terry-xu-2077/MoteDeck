@@ -225,7 +225,7 @@ def _dry_run() -> int:
 
     from . import (  # noqa: F401
         app,
-        application_update,
+        project_links,
         atvv_protocol,
         atvv_session,
         audio_output,

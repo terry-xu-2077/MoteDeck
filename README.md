@@ -155,16 +155,15 @@ $env:PYTHONPATH = Join-Path (Get-Location) 'src'
 
 ---
 
-## 检查更新
+## 升级
 
-“设备”页的“检查更新”只查询本仓库 [HZDavy/MoteDeck](https://github.com/HZDavy/MoteDeck) 的 GitHub Releases。启动后每天最多自动检查一次；下载由你手动触发，**不会自动运行下载文件或覆盖当前安装**，保存到桌面后请先完全退出 MoteDeck，再手动运行新下载的安装包。
+程序本身不联网检查更新。有新版时到 [Releases](https://github.com/HZDavy/MoteDeck/releases) 手动下载，先完全退出 MoteDeck，再运行新的安装包。
 
 ---
 
 ## 隐私与安全
 
 - 遥控器地址、按键记录、录音、配置和日志都只保存在本机 `%LOCALAPPDATA%\MoteDeck`，不会上传到项目服务器。
-- 检查更新只向 GitHub 请求公开发布信息，不发送本机数据。
 - 关闭设置窗口默认只是隐藏到通知区域；需要结束时右键通知区域图标并选择“完全退出”。
 - 自定义按键映射需要一次管理员授权安装本机权限助手；取消后自定义映射不会生效。普通按键和语音不受影响。
 

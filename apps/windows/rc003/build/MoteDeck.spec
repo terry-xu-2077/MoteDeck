@@ -447,8 +447,8 @@ a = Analysis(
         # window at startup. The Qt6OpenGL.dll/Qt6Network.dll runtimes STAY
         # in the bundle regardless - Qt6Quick and Qt6Qml link both at load
         # time (verified via their import tables). The bindings themselves
-        # are inert: no QML scene graph runs here and every HTTP call
-        # (application_update) goes through Python's own urllib/ssl stack,
+        # are inert: no QML scene graph runs here and no code path
+        # uses Qt networking (the app makes no update-check requests),
         # so the TLS/network-information plugins serving
         # QNetworkAccessManager are still dropped by the binary filter
         # (_is_unused_qt_runtime) below.

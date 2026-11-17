@@ -111,7 +111,7 @@ from . import (
     __version__,
     remote_selection,
     app_icons,
-    application_update,
+    project_links,
     audio_playback,
     audio_output,
     bridge_control_windows,
@@ -160,7 +160,7 @@ APPLICATION_UPDATE_CHECK_ENABLED = True
 # 名为 MoteDeck2Vokie.zip 的插件包，实际版本号保留在包内。
 VOKIE_WEBSITE_URL = "https://www.vokie.com"
 VOKIE_PLUGIN_URL = (
-    f"https://github.com/{application_update.REPOSITORY_SLUG}"
+    f"https://github.com/{project_links.REPOSITORY_SLUG}"
     "/releases/latest/download/MoteDeck2Vokie.zip"
 )
 OPENMEXIA_WEBSITE_URL = "https://hzdavy.github.io/OpenMexia/"
@@ -170,9 +170,9 @@ WETYPE_WEBSITE_URL = "https://z.weixin.qq.com/"
 DOUBAO_WEBSITE_URL = "https://shurufa.doubao.com/pc"
 CHATTERFLY_WEBSITE_URL = "https://chatterfly.tencent.com/"
 # 语音页「语音键设置教程」入口，指向帮助站点的语音输入页。
-VOICE_KEY_TUTORIAL_URL = f"{application_update.WEBSITE_URL}help/voice/"
+VOICE_KEY_TUTORIAL_URL = f"{project_links.WEBSITE_URL}help/voice/"
 # 设备页「软件协助」里的帮助入口，指向帮助站点首页。
-HELP_CENTER_URL = f"{application_update.WEBSITE_URL}help/"
+HELP_CENTER_URL = f"{project_links.WEBSITE_URL}help/"
 
 
 # Only the physical microphone button can own RC003 audio. Other buttons use
